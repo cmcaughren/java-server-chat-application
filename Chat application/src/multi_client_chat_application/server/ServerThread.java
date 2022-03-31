@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Set;
 
 //reference: https://gyawaliamit.medium.com/multi-client-chat-server-using-sockets-and-threads-in-java-2d0b64cad4a7
 //reference: https://medium.com/nerd-for-tech/create-a-chat-app-with-java-sockets-8449fdaa933
@@ -38,6 +39,9 @@ public class ServerThread extends Thread {
 		this.roomMessageHistories = roomMessageHistories;
 		this.roomname = roomname;
 		this.nickname = "Unset nickname";
+		
+		//add self serverthread to the room the user wants to move into
+		roomThreadLists.get(roomname).add(this);
 	} 
 	
 	@Override
@@ -51,7 +55,7 @@ public class ServerThread extends Thread {
 			//instantiate BufferedReader object to read from clientSocket.
 			//InputStreamReader creates stream reader for socket, reading the data as bytes
 			//then passing it to BufferedReader to be converted to characters 
-			in = new BufferedReader (new InputStreamReader(clientSocket.getInputStream()));
+			in = new BufferedReader (new InputStreamReader(clientSocket.getInputStream(), "US-ASCII"));
 			
 			while(true) {
 				
@@ -71,8 +75,18 @@ public class ServerThread extends Thread {
 					continue;
 				}
 				
-				//add another if else for /roomlist message, and then return all the chat rooms available
-				
+				//client will send "/roomlist" over tunnel if they want a list of all rooms available
+				if(outputString.equals("/roomlist")) {
+										
+					Set<String> roomList = roomThreadLists.keySet(); 
+					
+					for (String room: roomList) {
+						if (room != "none") {
+							out.println(room);
+						}
+					}
+					continue;
+				}
 
 				//client will send "/exit" to leave and delete thread
 				else if(outputString.equals("/exit")) {
@@ -90,6 +104,11 @@ public class ServerThread extends Thread {
 					//write message to the history for the room
 					roomMessageHistories.get(roomname).add("***" + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***");
 					//remove self serverthread from room in roomThreadLists
+					
+					//THIS WILL ERROR the list? Perhaps refer to threads in this array by username, not by "thread", as if you delete the thread
+					//may muck up the rest of the list? ERROR check this, have clients exit and ensure that all other clients are
+					//still themselves, and when you add new clients it doesnt f up?
+					//however we edit the list by "this" not by index? So I think its likely ok 
 					roomThreadLists.get(roomname).remove(this);
 					
 					out.close();

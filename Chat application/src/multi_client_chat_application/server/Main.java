@@ -5,7 +5,6 @@ import java.net.Socket;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 //reference: https://gyawaliamit.medium.com/multi-client-chat-server-using-sockets-and-threads-in-java-2d0b64cad4a7
@@ -16,8 +15,19 @@ public class Main {
 
 	public static void main(String[] args) {
 		
+		//A concurrent HashMap to store all threads. Each "key" in the HM is a chatroom roomname, and each
+		//"value" in the HM is an ArrayList of ServerThreads, one for each connected client.
+		//They are stored in the HM this way to make it easy to output messages to only users in the same room
+		//as the user posting a message. ConcurrentHashMap is used because each thread has its own reference
+		//to the HM, and ConcurrentHashMap will facilitate synchronizing each threads requests to access it 
 		ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists = new ConcurrentHashMap<String, ArrayList<ServerThread>>();
+		//A similar concurrent HashMap, used to store message histories for all the rooms 
 		ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories = new ConcurrentHashMap<String, ArrayList<String>>(); 
+		
+		//TODO
+		//Another concurrent HashMap used to keep track of the time of last message in each chatroom
+		//ConcurrentHashMap<String, Date> = new ConcurrentHashMap<String, Date>;
+		
 		
 		//create a default room for when clients first join 
 		ArrayList<ServerThread> homeThreadList = new ArrayList<>();
@@ -26,14 +36,14 @@ public class Main {
 		ArrayList<String> homeMessageList = new ArrayList<>();
 		roomMessageHistories.put("DefaultRoom", homeMessageList);
 		
-		//set the string format we want for datetimestamps
+		//set the string format to use for datetimestamps which will be attached to all messages 
 		SimpleDateFormat dtformat = new SimpleDateFormat("dd/mm/yy HH:mm:ss");
 		//get the current date and time
 		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 		//convert that time stamp using the format outlined
 		String ts = dtformat.format(timestamp); 
 
-		//Add a log message of the server start to the default none chatroom 
+		//Add a log message of the server start to the DefaultRoom chatroom 
 		roomMessageHistories.get("DefaultRoom").add("***[" + ts + "] Chatroom Application Server Started***");
 		
  		//Start the server chat
@@ -47,6 +57,7 @@ public class Main {
 				
 				System.out.println("Client thread started....");
 				
+				//Place new user in the DefaultRoom and pass them a reference to the list of all chatrooms and message histories 
 				ServerThread serverThread = new ServerThread(socket, "DefaultRoom", roomThreadLists, roomMessageHistories);
 				serverThread.start();
 			}

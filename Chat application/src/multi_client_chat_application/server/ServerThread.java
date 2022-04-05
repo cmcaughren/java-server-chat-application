@@ -4,9 +4,12 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 //reference: https://gyawaliamit.medium.com/multi-client-chat-server-using-sockets-and-threads-in-java-2d0b64cad4a7
 //reference: https://medium.com/nerd-for-tech/create-a-chat-app-with-java-sockets-8449fdaa933
@@ -17,9 +20,9 @@ public class ServerThread extends Thread {
 	//used to send and receive data from the client
 	private Socket clientSocket;
 	
-	private HashMap<String, ArrayList<ServerThread>> roomThreadLists;
+	private ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists;
 	
-	private HashMap<String, ArrayList<String>> roomMessageHistories;
+	private ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories;
 	
 	//used to read data from the clientSocket object
 	private BufferedReader in;
@@ -33,7 +36,10 @@ public class ServerThread extends Thread {
 	//nickname of the user
 	private String nickname;
 	
-	public ServerThread(Socket socket, String roomname, HashMap<String, ArrayList<ServerThread>> roomThreadLists, HashMap<String, ArrayList<String>> roomMessageHistories) {
+	//set the string format we want for datetimestamps
+	SimpleDateFormat dtformat = new SimpleDateFormat("dd/mm/yy HH:mm:ss");
+	
+	public ServerThread(Socket socket, String roomname, ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists, ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories) {
 		this.clientSocket = socket;
 		this.roomThreadLists = roomThreadLists;
 		this.roomMessageHistories = roomMessageHistories;
@@ -59,6 +65,11 @@ public class ServerThread extends Thread {
 			
 			while(true) {
 				
+				//get the current date and time
+				Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+				//convert that time stamp using the format outlined
+				String ts = dtformat.format(timestamp); 
+				
 				String outputString = in.readLine();
 				
 				//client will send "/nickname somenickname" to set the nickname 
@@ -76,12 +87,13 @@ public class ServerThread extends Thread {
 				}
 				
 				//client will send "/roomlist" over tunnel if they want a list of all rooms available
+				//TODO checkthat a room is not over a week old before sending it in the list
 				if(outputString.equals("/roomlist")) {
 										
 					Set<String> roomList = roomThreadLists.keySet(); 
 					
 					for (String room: roomList) {
-						if (room != "none") {
+						if (room != "DefaultRoom") {
 							out.println(room);
 						}
 					}
@@ -97,12 +109,12 @@ public class ServerThread extends Thread {
 					for (ServerThread thread: roomThreadLists.get(roomname)) {
 						 
 						//TODO** update the way the message is updated to include timestamp
-						thread.out.println("***" + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***");
+						thread.out.println("***[" + ts + "] " + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***");
 						
 					}
 					
 					//write message to the history for the room
-					roomMessageHistories.get(roomname).add("***" + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***");
+					roomMessageHistories.get(roomname).add("***[" + ts + "] " + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***");
 					//remove self serverthread from room in roomThreadLists
 					
 					//THIS WILL ERROR the list? Perhaps refer to threads in this array by username, not by "thread", as if you delete the thread
@@ -126,15 +138,17 @@ public class ServerThread extends Thread {
 					String oldroom = this.roomname;
 					
 					//output message to current chat room, saying client is leaving
-					for (ServerThread thread: roomThreadLists.get(roomname)) {
-						 
-						//TODO** update the way the message is updated to include timestamp
-						thread.out.println("***" + this.nickname + " has left the chatroom " + this.roomname + "***");
-						
+					//todo dont output for default room
+					if (oldroom != "DefaultRoom") {
+						for (ServerThread thread: roomThreadLists.get(roomname)) {
+							 
+							//TODO** update the way the message is updated to include timestamp
+							thread.out.println("***[" + ts + "] " + this.nickname + " has left the chatroom " + this.roomname + "***");
+							
+						}
 					}
-					
 					//write message to the history for the room
-					roomMessageHistories.get(roomname).add("***" + this.nickname + " has left the chatroom " + this.roomname + "***");
+					roomMessageHistories.get(roomname).add("***[" + ts + "] " + this.nickname + " has left the chatroom " + this.roomname + "***");
 					
 					//remove self serverthread from room in roomThreadLists
 					roomThreadLists.get(roomname).remove(this);
@@ -162,15 +176,15 @@ public class ServerThread extends Thread {
 				 
 							//TODO** update the way the message is updated to include timestamp
 							thread.out.println("************************************************************");
-							thread.out.println("***" + roomname + " has been created by " + this.nickname + "***");
-							thread.out.println("***" + this.nickname + " has joined the chatroom " + this.roomname + "***");
+							thread.out.println("***[" + ts + "] Chatroom " + roomname + " has been created by " + this.nickname + "***");
+							thread.out.println("***[" + ts + "] " + this.nickname + " has joined the chatroom " + this.roomname + "***");
 							
 						}
 						//write message to the history for the room
 						//**add dates/times to this string**
 						roomMessageHistories.get(roomname).add("*************************MESSAGE HISTORY***********************************");
-						roomMessageHistories.get(roomname).add("***" + roomname + " has been created by " + this.nickname + "***");
-						roomMessageHistories.get(roomname).add("***" + this.nickname + " has joined the chatroom " + this.roomname + "***");
+						roomMessageHistories.get(roomname).add("***[" + ts + "] Chatroom " + roomname + " has been created by " + this.nickname + "***");
+						roomMessageHistories.get(roomname).add("***[" + ts + "] " + this.nickname + " has joined the chatroom " + this.roomname + "***");
 						
 						System.out.println("Created new chat room named " + roomname + "....");
 						//** add room in to store messages??
@@ -196,11 +210,11 @@ public class ServerThread extends Thread {
 					for (ServerThread thread: roomThreadLists.get(roomname)) {
 										
 						//TODO** update the way the message is updated to include timestamp
-						thread.out.println("***" + this.nickname + " has joined the chatroom " + this.roomname + "***");
+						thread.out.println("***[" + ts + "] " + this.nickname + " has joined the chatroom " + this.roomname + "***");
 											
 					}
 					//write message to the history for the room
-					roomMessageHistories.get(roomname).add("***" + this.nickname + " has joined the chatroom " + this.roomname + "***");
+					roomMessageHistories.get(roomname).add("***[" + ts + "] " + this.nickname + " has joined the chatroom " + this.roomname + "***");
 				
 					continue;
 				}
@@ -211,12 +225,12 @@ public class ServerThread extends Thread {
 										 
 					
 					//TODO** update the way the message is updated to include timestamp
-					thread.out.println("(" + this.nickname + "):" + outputString);
+					thread.out.println("[" + ts + "] " + "(" + this.nickname + "):" + outputString);
 					System.out.println("Chatroom " + roomname + " recieved: " + "(" + this.nickname + "):" + outputString );
 					
-					//write message to the history for the room
-					roomMessageHistories.get(roomname).add("(" + this.nickname + "):" + outputString);
 				}
+				//write message to the history for the room
+				roomMessageHistories.get(roomname).add("[" + ts + "] " + "(" + this.nickname + "):" + outputString);
 
 			}
 		} catch (Exception e) {

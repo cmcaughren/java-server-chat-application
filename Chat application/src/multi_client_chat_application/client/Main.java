@@ -19,7 +19,7 @@ public class Main {
 		String hostName = "127.0.0.1"; //can use command line to get args[0]? 
 		
 		//port number which is the port number defined by the server in Server.java
-		int portNumber =  5000; //use command line to get args[1]? 
+		int portNumber = 8888; //use command line to get args[1]? 
 		
 		//socket used by client to send and receive data from server
 		try (Socket clientSocket = new Socket(hostName, portNumber)){

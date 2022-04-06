@@ -21,10 +21,17 @@ public class ServerThread extends Thread {
 	//used to send and receive data from the client
 	private Socket clientSocket;
 	
+	//A concurrent HashMap to store all threads. Each "key" in the HM is a chatroom roomname, and each
+	//"value" in the HM is an ArrayList of ServerThreads, one for each connected client.
+	//They are stored in the HM this way to make it easy to output messages to only users in the same room
+	//as the user posting a message. ConcurrentHashMap is used because each thread has its own reference
+	//to the HM, and ConcurrentHashMap will facilitate synchronizing each threads requests to access it 
 	private ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists;
 	
+	//A similar concurrent HashMap, used to store message histories for all the rooms 
 	private ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories;
 	
+	//Another concurrent HashMap used to keep track of the time of last message in each chatroom
 	private ConcurrentHashMap<String, LocalDate> lastRoomMessageDates;
 	
 	//used to read data from the clientSocket object
@@ -45,6 +52,8 @@ public class ServerThread extends Thread {
 	//current time, formatted, for outputting in messages 
 	private String ts; 
 	
+	//used to hold the current date for use in updating the last message in lastRoomMessageDates
+	//for any room this thread posts a message to
 	private LocalDate currentDate;
 	
 	
@@ -90,7 +99,8 @@ public class ServerThread extends Thread {
 				//get the local date for todays date
 				currentDate = LocalDate.now();
 				
-				//TESTING
+				//*************************************
+				//***Inserting a chatroom with a very old date of last message to test the 'delete' functionality ****
 				LocalDate testOld = LocalDate.of(2015, 6, 19);
 				
 				//create a new ArrayList to store the threads which will join this room
@@ -104,7 +114,7 @@ public class ServerThread extends Thread {
 			
 				//Add an entry in lastRoomMessageDates for the new room, with todays Date 
 				lastRoomMessageDates.put("testRoomname", testOld);
-				
+				//*************************************
 				
 				
 				//client will send "/nickname somenickname" to set the nickname 
@@ -189,16 +199,16 @@ public class ServerThread extends Thread {
 		String message = "***[" + ts + "] " + this.nickname + " has left the chatroom " + this.roomname + " and quit the application***";
 		System.out.println(nickname + " is disconnecting...");
 		
+		//remove self serverthread from room in roomThreadLists
+		roomThreadLists.get(roomname).remove(this);
+		
 		//output message to all threads in the current chat room, announcing client is leaving the chatroom and the application
 		for (ServerThread thread: roomThreadLists.get(roomname)) { 
 			thread.out.println(message);
 		}
 		//write exit announcement message to the history for the room
 		roomMessageHistories.get(roomname).add(message);
-		
-		//remove self serverthread from room in roomThreadLists
-		roomThreadLists.get(roomname).remove(this);
-		
+				
 		//update date of last message in lastRoomMessageDates for this room  
 		lastRoomMessageDates.put(roomname, currentDate);
 		

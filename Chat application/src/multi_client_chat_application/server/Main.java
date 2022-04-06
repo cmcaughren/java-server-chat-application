@@ -4,6 +4,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,9 +25,8 @@ public class Main {
 		//A similar concurrent HashMap, used to store message histories for all the rooms 
 		ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories = new ConcurrentHashMap<String, ArrayList<String>>(); 
 		
-		//TODO
 		//Another concurrent HashMap used to keep track of the time of last message in each chatroom
-		//ConcurrentHashMap<String, Date> = new ConcurrentHashMap<String, Date>;
+		ConcurrentHashMap<String, LocalDate> lastRoomMessageDates = new ConcurrentHashMap<String, LocalDate> ();
 		
 		
 		//create a default room for when clients first join 
@@ -58,11 +58,11 @@ public class Main {
 				System.out.println("Client thread started....");
 				
 				//Place new user in the DefaultRoom and pass them a reference to the list of all chatrooms and message histories 
-				ServerThread serverThread = new ServerThread(socket, "DefaultRoom", roomThreadLists, roomMessageHistories);
+				ServerThread serverThread = new ServerThread(socket, "DefaultRoom", roomThreadLists, roomMessageHistories, lastRoomMessageDates);
 				serverThread.start();
 			}
 		} catch (Exception e) {
-			System.out.println("Error occured in main: " + e.getStackTrace());
+			System.out.println("Error occured in Server Main when trying to create new serversocket: " + e.getStackTrace());
 		}
 
 	}

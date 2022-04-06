@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +24,8 @@ public class ServerThread extends Thread {
 	private ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists;
 	
 	private ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories;
+	
+	private ConcurrentHashMap<String, LocalDate> lastRoomMessageDates;
 	
 	//used to read data from the clientSocket object
 	private BufferedReader in;
@@ -42,12 +45,21 @@ public class ServerThread extends Thread {
 	//current time, formatted, for outputting in messages 
 	private String ts; 
 	
-	public ServerThread(Socket socket, String roomname, ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists, ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories) {
+	private LocalDate currentDate;
+	
+	
+	public ServerThread(Socket socket, 
+						String roomname, 
+						ConcurrentHashMap<String, ArrayList<ServerThread>> roomThreadLists, 
+						ConcurrentHashMap<String, ArrayList<String>> roomMessageHistories, 
+						ConcurrentHashMap<String, LocalDate> lastRoomMessageDates) {
 		this.clientSocket = socket;
 		this.roomThreadLists = roomThreadLists;
 		this.roomMessageHistories = roomMessageHistories;
+		this.lastRoomMessageDates = lastRoomMessageDates;
 		this.roomname = roomname;
 		this.nickname = "Unset nickname";
+		this.currentDate = LocalDate.now();
 		
 		//add self serverthread to the room the user wants to move into
 		roomThreadLists.get(roomname).add(this);
@@ -68,13 +80,32 @@ public class ServerThread extends Thread {
 			
 			while(true) {
 				
-				//get the current date and time
-				Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-				//convert that time stamp using the format outlined
-				ts = dtformat.format(timestamp); 
-				
 				//get the message from the client thread over the socket
 				String outputString = in.readLine();
+				
+				//get the current date and time
+				Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+				//convert that time stamp using the format outlined and update the time for this iteration of the while loop for this thread
+				ts = dtformat.format(timestamp); 
+				//get the local date for todays date
+				currentDate = LocalDate.now();
+				
+				//TESTING
+				LocalDate testOld = LocalDate.of(2015, 6, 19);
+				
+				//create a new ArrayList to store the threads which will join this room
+				//store it in the newroom name in the HashMap of all chatrooms
+				ArrayList<ServerThread> testThreadList = new ArrayList<>();
+				roomThreadLists.put("testRoomname", testThreadList);
+				
+				//create a new message history list for the new room and add it to roomMessageHistories
+				ArrayList<String> testRoomMessageList = new ArrayList<>();
+				roomMessageHistories.put("testRoomname", testRoomMessageList);
+			
+				//Add an entry in lastRoomMessageDates for the new room, with todays Date 
+				lastRoomMessageDates.put("testRoomname", testOld);
+				
+				
 				
 				//client will send "/nickname somenickname" to set the nickname 
 				if(outputString.startsWith("/nickname ")) {
@@ -84,8 +115,8 @@ public class ServerThread extends Thread {
 				}
 				
 				//client will send "/roomlist" over tunnel if they want a list of all rooms available
-				//TODO checkthat a room is not over a week old before sending it in the list
 				else if(outputString.equals("/roomlist")) {
+					
 					printRoomList();					
 					continue;
 				}
@@ -135,14 +166,22 @@ public class ServerThread extends Thread {
 	public void printRoomList() {
 		//create a set of strings to hold all of those in the roomThreadLists HashMap
 		Set<String> roomList = roomThreadLists.keySet(); 
+	
+		//will check date of last messages in each room to ensure they
+		//are not over a week old, and delete them if needed
+		checkLastMessageDates();
 		
 		//output each chatroom name to client thread for displaying to the user
 		//do not include DefaultRoom in the output, as we don't want the user moving back to that room 
+		
+		String roomListString = "###";	
+		
 		for (String room: roomList) {
 			if (room != "DefaultRoom") {
-				out.println(room);
+				roomListString = roomListString + "-" + room;
 			}
 		}
+		out.println(roomListString);
 	}
 	
 	public void clientExit() {
@@ -159,6 +198,9 @@ public class ServerThread extends Thread {
 		
 		//remove self serverthread from room in roomThreadLists
 		roomThreadLists.get(roomname).remove(this);
+		
+		//update date of last message in lastRoomMessageDates for this room  
+		lastRoomMessageDates.put(roomname, currentDate);
 		
 		//Close the output stream and socket
 		out.close();
@@ -187,12 +229,18 @@ public class ServerThread extends Thread {
 		}
 		//write message to the history for the room
 		roomMessageHistories.get(roomname).add(message);
+		
+		//update date of last message in lastRoomMessageDates for this room  
+		lastRoomMessageDates.put(roomname, currentDate);
+		
 		//remove self serverthread from room in roomThreadLists
 		roomThreadLists.get(roomname).remove(this);
 	}
 	
 	public void createChatroom() {
 
+		
+		
 		String headerMessage = "***************************************************************************";
 		String headerHistoryOutput = "*******************************MESSAGE HISTORY*****************************";
 		String message1 = "***[" + ts + "] Chatroom " + roomname + " has been created by " + this.nickname + "***";
@@ -211,6 +259,9 @@ public class ServerThread extends Thread {
 		//add self serverthread to the room the user wants to move into
 		roomThreadLists.get(roomname).add(this);
 		
+		//Add an entry in lastRoomMessageDates for the new room, with todays Date 
+		lastRoomMessageDates.put(roomname, currentDate);
+				
 		//output message to current chat room, saying client is joining and new room created
 		for (ServerThread thread: roomThreadLists.get(roomname)) {
  
@@ -250,6 +301,9 @@ public class ServerThread extends Thread {
 		}
 		//write message to the history for the room
 		roomMessageHistories.get(roomname).add(message);
+
+		//update date of last message in lastRoomMessageDates for this room  
+		lastRoomMessageDates.put(roomname, currentDate);
 	}
 	
 	public void processMessage(String outputString) {
@@ -262,6 +316,51 @@ public class ServerThread extends Thread {
 		}
 		//write message to the history for the room
 		roomMessageHistories.get(roomname).add(message);
+		
+		//update date of last message in lastRoomMessageDates for this room 
+		lastRoomMessageDates.put(roomname, currentDate);
+	}
+	
+	public void checkLastMessageDates() {
+		
+		LocalDate oldestPossibleDateAllowed = currentDate.minusDays(7);
+		
+		System.out.println("got in checkLastMessageDates: oldest allowed is " + oldestPossibleDateAllowed);
+		
+		//cycle through each key, value entry in the lastRoomMessageDates ConcurrentHashMap
+		for (ConcurrentHashMap.Entry<String, LocalDate> entry : lastRoomMessageDates.entrySet()) {
+			String roomname_iter = entry.getKey();
+			LocalDate lastDate = entry.getValue();
+			
+			System.out.println("got in for loop. " + roomname_iter + " " + lastDate);
+			
+			//if the date of the last message for this chatroom is older than 7 days
+			if (lastDate.isBefore(oldestPossibleDateAllowed)) {
+				
+				
+				System.out.println("got in is before check");
+				//add all inactive but connected threads in its room to DefaultRoom thread 
+				for (ServerThread thread: roomThreadLists.get(roomname_iter)) {
+					
+					System.out.println("got in move threads check");
+					roomThreadLists.get("DefaultRoom").add(thread);	
+					System.out.println("got in move threads check b");
+					thread.roomname = "DefaultRoom";
+					System.out.println("got in move threads c check");
+				}
+				
+				//delete the room from roomThreadLists
+				roomThreadLists.remove(roomname_iter);
+				
+				//delete the room from roomMessageHistories;
+				roomMessageHistories.remove(roomname_iter);
+				
+				//delete the room from lastRoomMessageDates
+				lastRoomMessageDates.remove(roomname_iter);
+				
+				
+			}
+		}		
 	}
 
 }

@@ -37,7 +37,7 @@ public class Main {
 		roomMessageHistories.put("DefaultRoom", homeMessageList);
 		
 		//set the string format to use for datetimestamps which will be attached to all messages 
-		SimpleDateFormat dtformat = new SimpleDateFormat("dd/mm/yy HH:mm:ss");
+		SimpleDateFormat dtformat = new SimpleDateFormat("dd/MM/yy HH:mm:ss");
 		//get the current date and time
 		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 		//convert that time stamp using the format outlined

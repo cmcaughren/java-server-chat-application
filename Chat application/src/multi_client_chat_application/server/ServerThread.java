@@ -47,7 +47,7 @@ public class ServerThread extends Thread {
 	private String nickname;
 		
 	//set the string format we want for datetimestamps
-	private SimpleDateFormat dtformat = new SimpleDateFormat("dd/mm/yy HH:mm:ss");
+	private SimpleDateFormat dtformat = new SimpleDateFormat("dd/MM/yy HH:mm:ss");
 	
 	//current time, formatted, for outputting in messages 
 	private String ts; 
@@ -334,29 +334,20 @@ public class ServerThread extends Thread {
 	public void checkLastMessageDates() {
 		
 		LocalDate oldestPossibleDateAllowed = currentDate.minusDays(7);
-		
-		System.out.println("got in checkLastMessageDates: oldest allowed is " + oldestPossibleDateAllowed);
-		
+
 		//cycle through each key, value entry in the lastRoomMessageDates ConcurrentHashMap
 		for (ConcurrentHashMap.Entry<String, LocalDate> entry : lastRoomMessageDates.entrySet()) {
 			String roomname_iter = entry.getKey();
 			LocalDate lastDate = entry.getValue();
 			
-			System.out.println("got in for loop. " + roomname_iter + " " + lastDate);
-			
 			//if the date of the last message for this chatroom is older than 7 days
 			if (lastDate.isBefore(oldestPossibleDateAllowed)) {
 				
-				
-				System.out.println("got in is before check");
 				//add all inactive but connected threads in its room to DefaultRoom thread 
 				for (ServerThread thread: roomThreadLists.get(roomname_iter)) {
 					
-					System.out.println("got in move threads check");
 					roomThreadLists.get("DefaultRoom").add(thread);	
-					System.out.println("got in move threads check b");
 					thread.roomname = "DefaultRoom";
-					System.out.println("got in move threads c check");
 				}
 				
 				//delete the room from roomThreadLists
